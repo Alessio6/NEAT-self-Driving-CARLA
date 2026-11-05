@@ -42,7 +42,8 @@ def parse(lines):
             if gen == state["gen"]:
                 state["done"], state["pop"] = i, pop
                 state["gen_best"] = fit if state["gen_best"] is None else max(state["gen_best"], fit)
-                state["survived"] += end == "time_limit"
+                # v1: survived the time limit; v2: completed every route
+                state["survived"] += all(e in ("time_limit", "completed") for e in end.split(","))
             state["best"] = fit if state["best"] is None else max(state["best"], fit)
             continue
         if "Training finished" in line or "Stopped by user" in line:
@@ -91,7 +92,7 @@ def render(state, total, pop_size, sec_per_gen, log_age):
 
     return [
         f"Overall     {bar(overall)}  generation {gen}/{total}",
-        f"Generation  {bar(within)}  car {state['done']}/{pop}, {state['survived']} drove the full time",
+        f"Generation  {bar(within)}  car {state['done']}/{pop}, {state['survived']} finished every drive",
         f"Best fitness: {best} overall, {gen_best} this generation",
         status,
     ]

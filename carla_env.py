@@ -9,7 +9,14 @@ import math
 import queue
 import random
 
-import carla
+try:
+    import carla
+except ImportError:
+    raise SystemExit(
+        "The 'carla' package isn't installed for this Python ("
+        + __import__("sys").executable + ").\n"
+        "Use the conda env's Python instead, e.g. .\\play.bat, or:\n"
+        "  & \"$env:USERPROFILE\\anaconda3\\envs\\carla\\python.exe\" play.py")
 import numpy as np
 
 # ---- Observation layout ---------------------------------------------------
@@ -72,6 +79,8 @@ def wrap_angle(a):
 
 
 class CarlaEnv:
+    lidar_range = LIDAR_RANGE
+
     def __init__(self, host="localhost", port=2000, town="Town04", num_npcs=30,
                  no_render=False, tm_port=8000, seed=None):
         self.rng = random.Random(seed)
@@ -160,7 +169,7 @@ class CarlaEnv:
 
         lidar_bp = self.blueprints.find("sensor.lidar.ray_cast")
         lidar_bp.set_attribute("channels", "32")
-        lidar_bp.set_attribute("range", str(LIDAR_RANGE))
+        lidar_bp.set_attribute("range", str(self.lidar_range))
         lidar_bp.set_attribute("points_per_second", "200000")
         lidar_bp.set_attribute("rotation_frequency", str(1.0 / FIXED_DELTA))
         lidar_bp.set_attribute("upper_fov", "10")
@@ -182,7 +191,11 @@ class CarlaEnv:
         self.collided = True
 
     # ---- Episode API ------------------------------------------------------
-    def reset(self, spawn_index=None):
+    def reset(self, spawn_index=None, episode_seed=None):
+        self._respawn(spawn_index)
+        return self._observe()
+
+    def _respawn(self, spawn_index):
         self._destroy_ego()
         if spawn_index is None:
             spawn_index = self.rng.randrange(len(self.spawn_points))
@@ -194,7 +207,6 @@ class CarlaEnv:
             self.ego.apply_control(carla.VehicleControl(brake=1.0))
             self._tick()
         self.collided = False
-        return self._observe()
 
     def step(self, action):
         steer = float(np.clip(action[0], -1.0, 1.0))

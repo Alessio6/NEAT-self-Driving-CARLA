@@ -1,7 +1,7 @@
 # Trains with the "carla" conda env's Python, appends the output to
 # logs\training_log.txt (which progress.py reads) and, if training crashes
-# (e.g. a CARLA or GPU driver hiccup), waits for CARLA and resumes from the
-# latest checkpoint.
+# (e.g. a CARLA or GPU driver hiccup), restarts CARLA if it has frozen and
+# resumes from the latest checkpoint.
 #
 #   .\run_training.ps1 -Generations 100 -Npcs 0 -NoRender
 #   .\run_training.ps1 -Resume checkpoints\neat-checkpoint-40 -Generations 60 -Npcs 30 -NoRender
@@ -15,7 +15,8 @@ param(
     [switch]$NoRender,
     [switch]$Viz,
     [string]$VizSave = "",
-    [int]$MaxRestarts = 20
+    [int]$MaxRestarts = 20,
+    [string]$CarlaPath = "C:\CARLA_0.9.15\WindowsNoEditor\CarlaUE4.exe"
 )
 
 $python = "$env:USERPROFILE\anaconda3\envs\carla\python.exe"
@@ -34,13 +35,26 @@ function Get-LatestCheckpoint {
         Sort-Object { Get-CheckpointNumber $_.Name } | Select-Object -Last 1
 }
 
-function Wait-ForCarla([int]$timeoutSeconds = 600) {
-    $deadline = (Get-Date).AddSeconds($timeoutSeconds)
+function Test-CarlaResponds {
+    & $python -m neat_driver.healthcheck 2>$null | Out-Null
+    return $LASTEXITCODE -eq 0
+}
+
+# Makes sure CARLA answers, restarting it if it has frozen or closed.
+function Confirm-Carla {
+    if (Test-CarlaResponds) { return $true }
+    if (-not (Test-Path $CarlaPath)) {
+        Write-Host "CARLA isn't responding and wasn't found at $CarlaPath (set -CarlaPath)."
+        return $false
+    }
+    Write-Host "CARLA isn't responding - restarting it..."
+    Get-Process CarlaUE4* -ErrorAction SilentlyContinue | Stop-Process -Force
+    Start-Sleep 5
+    Start-Process $CarlaPath -ArgumentList "-quality-level=Low"
+    $deadline = (Get-Date).AddMinutes(5)
     while ((Get-Date) -lt $deadline) {
-        $client = New-Object Net.Sockets.TcpClient
-        try { $client.Connect("localhost", 2000); $client.Close(); return $true } catch { }
-        $client.Close()
-        Start-Sleep 10
+        Start-Sleep 15
+        if (Test-CarlaResponds) { Start-Sleep 10; return $true }
     }
     return $false
 }
@@ -75,11 +89,10 @@ while ($true) {
         Write-Host "Training crashed $restarts times - giving up. Resume manually from $($latest.Name)."
         exit 1
     }
-    Write-Host "`nTraining crashed (exit code $exitCode). Restart $restarts of $MaxRestarts - waiting for CARLA..."
-    if (-not (Wait-ForCarla)) {
-        Write-Host "CARLA isn't responding on port 2000 - restart it, then resume from $($latest.Name)."
+    Write-Host "`nTraining crashed (exit code $exitCode). Restart $restarts of $MaxRestarts - checking CARLA..."
+    if (-not (Confirm-Carla)) {
+        Write-Host "CARLA couldn't be restarted - start it, then resume from $($latest.Name)."
         exit 1
     }
-    Start-Sleep 15  # give CARLA a moment to settle
     if ($latest) { $Resume = Join-Path $checkpointDir $latest.Name }
 }

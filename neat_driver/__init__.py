@@ -12,6 +12,7 @@ Modules:
     evaluation    scoring genomes, the route-length curriculum
     netviz        matplotlib view of a network and its live signals
     training_log  reading the training log for the progress bar
+    healthcheck   does the CARLA server answer? (used by run_training.ps1)
 """
 
 try:

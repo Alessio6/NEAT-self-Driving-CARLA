@@ -40,8 +40,9 @@ powershell -ExecutionPolicy Bypass -File .\run_training.ps1 -Generations 100 -Np
 - `-NoRender` skips graphics, which is faster; `-Npcs` sets the amount of traffic.
 - Continue a run with `-Resume checkpoints\neat-checkpoint-N` (training
   stops at generation N + `-Generations`).
-- If training crashes, the script waits for CARLA and resumes from the
-  latest checkpoint by itself (up to 20 times).
+- If training crashes, the script restarts CARLA if it has frozen and
+  resumes from the latest checkpoint by itself (up to 20 times). If CARLA
+  isn't in `C:\CARLA_0.9.15`, pass `-CarlaPath <path to CarlaUE4.exe>`.
 - Ctrl+C stops it; the best car so far is always in `models\best_genome.pkl`.
 
 A live progress bar with an ETA, in a second terminal (it only reads the log):
@@ -144,6 +145,7 @@ neat_driver/
     evaluation.py                driving genomes, the route-length curriculum
     netviz.py                    network window
     training_log.py              log reading for the progress bar
+    healthcheck.py               does CARLA answer? (used by run_training.ps1)
 models/                          trained cars (models/v1: cars from the first version)
 logs/training_log.txt            output of every training run
 checkpoints/                     NEAT checkpoints (not in git)
@@ -161,8 +163,10 @@ Run the tests (no simulator needed):
   `play.bat` / `run_training.ps1`, or the env's `python.exe` directly.
 - **Training or play can't connect / times out** — CARLA isn't running, is
   still loading, or has frozen (it can after a graphics driver hiccup).
-  Restart `CarlaUE4.exe`. Updating the graphics driver helps if it keeps
-  happening.
+  Restart `CarlaUE4.exe`; `run_training.ps1` does this by itself.
+- **CARLA keeps freezing** (Windows logs graphics-driver "LiveKernelEvent
+  193" errors) — try training without `-NoRender`, and update the graphics
+  driver. Long runs with graphics on have been stable.
 - **`.ps1` scripts are blocked** — run them through
   `powershell -ExecutionPolicy Bypass -File ...` as shown above.
 - Don't run `play.bat` while training is running: both would drive the same

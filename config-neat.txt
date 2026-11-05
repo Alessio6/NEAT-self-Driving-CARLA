@@ -1,14 +1,19 @@
+# neat-python settings. The inputs and outputs must match neat_driver/env.py
+# (INPUT_LABELS / OUTPUT_LABELS); training checks this when it starts.
+
 [NEAT]
-fitness_criterion     = max
-fitness_threshold     = 1000.0
-pop_size              = 40
-reset_on_extinction   = True
-no_fitness_termination = False
+fitness_criterion      = max
+# no early stop: training runs for the requested number of generations
+fitness_threshold      = 1000000.0
+no_fitness_termination = True
+pop_size               = 50
+reset_on_extinction    = True
 
 [DefaultGenome]
-# 16 LiDAR sectors + speed, heading error, lateral offset, look-ahead angle
-num_inputs              = 20
-# steer, throttle(+)/brake(-)
+# 16 LiDAR rays, speed, speed limit, heading error, lane offset,
+# route direction at 5/15/30 m, previous steer, previous pedal, red light
+num_inputs              = 26
+# steer, throttle (+) / brake (-)
 num_outputs             = 2
 num_hidden              = 0
 feed_forward            = True
@@ -62,7 +67,7 @@ compatibility_threshold = 3.0
 
 [DefaultStagnation]
 species_fitness_func = max
-max_stagnation       = 15
+max_stagnation       = 20
 species_elitism      = 2
 
 [DefaultReproduction]
